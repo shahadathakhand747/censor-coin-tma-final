@@ -27,10 +27,12 @@ jobs:
           version: 10
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
+        env:
+          npm_config_user_agent: pnpm/10
 
       - name: Type check
-        run: pnpm tsc --noEmit
+        run: pnpm typecheck
 
       - name: Build
         run: pnpm build
