@@ -75,14 +75,7 @@ declare global {
         };
       };
     };
-    OnClickA?: {
-      showRewardedAd: (opts: {
-        adCode: string | number;
-        onComplete: () => void;
-        onError?: (err: unknown) => void;
-      }) => void;
-    };
-    show_10883491?: (format?: string) => Promise<void>;
+    initCdTma?: (options: { id: number }) => Promise<() => Promise<void>>;
   }
 }
 

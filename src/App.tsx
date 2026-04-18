@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { UserProvider } from './context/UserContext';
 import { useDisableContextMenu } from './hooks/useDisableContextMenu';
+import { useGlobalClickSound } from './hooks/useGlobalClickSound';
 import SplashScreen from './pages/SplashScreen';
 import VerifyPage from './pages/VerifyPage';
 import HomePage from './pages/HomePage';
@@ -17,6 +18,7 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 function AppInner() {
   useDisableContextMenu();
+  useGlobalClickSound();
 
   return (
     <BrowserRouter basename={BASE || '/'}>

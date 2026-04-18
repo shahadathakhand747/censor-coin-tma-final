@@ -79,6 +79,8 @@
     "@telegram-apps/sdk-react": "^2.0.25",
     "i18next": "^26.0.5",
     "lottie-react": "^2.4.1",
+    "monetag-tg-sdk": "^1.0.3",
+    "radix-ui": "^1.4.3",
     "react-i18next": "^17.0.4",
     "react-router-dom": "^7.14.1",
     "use-sound": "^5.0.0"

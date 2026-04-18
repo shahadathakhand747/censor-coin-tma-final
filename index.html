@@ -6,38 +6,13 @@
     <meta name="theme-color" content="#0D0D0D" />
     <title>Censor Coin</title>
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&display=swap"
       rel="stylesheet"
     />
-
-    <!--
-      MONETAG — Rewarded Interstitial / Popunder
-      Zone ID : 10883491
-      SDK fn  : show_10883491()       → rewarded interstitial
-              : show_10883491('pop')  → popunder
-    -->
-    <script src="//libtl.com/sdk.js" data-zone="10883491" data-sdk="show_10883491" async></script>
-
-    <!--
-      OnClickA — Rewarded Ad (In-Stream TMA)
-      Spot ID : 6116695
-      Ad Code : 436671
-    -->
     <script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
-
-    <!-- OnClickA dev stub — provides fallback outside real SDK -->
-    <script>
-      window.OnClickA = window.OnClickA || {
-        showRewardedAd: function (opts) {
-          console.warn('[OnClickA] SDK not loaded — running dev fallback (reward granted).');
-          if (opts && typeof opts.onComplete === 'function') opts.onComplete();
-        },
-      };
-    </script>
   </head>
   <body>
     <div id="root"></div>

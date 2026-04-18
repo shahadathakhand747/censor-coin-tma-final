@@ -1,133 +1,171 @@
 # Censor Coin TMA
 
-A Telegram Mini App (TMA) for the **Censor Coin** ecosystem — users earn $CENSOR tokens by completing daily content-moderation tasks, entering claim codes, and completing social missions.
+Telegram Mini App for the Censor Coin ecosystem. Users earn coins by verifying Telegram membership, completing daily moderation tasks, entering daily claim codes, completing social missions, and referring friends.
 
----
+## Stack
 
-## Features
+- React 19 + Vite
+- Tailwind CSS v4
+- shadcn/ui components
+- framer-motion and Lottie animations
+- Telegram Mini App APIs and CloudStorage
+- i18next localization
+- Monetag Telegram SDK and OnClickA TMA rewarded ads
 
-- **Splash screen** — animated amber coin with framer-motion entrance
-- **Channel verification** — confirms Telegram channel membership via external worker before granting access
-- **Daily censoring tasks** — 6 moderation tasks per day (5,000 coins each), rewarded after a Monetag interstitial ad
-- **Claim codes** — 7 claim codes per day (3,000 coins each), validated against `PREFIX-YYYYMMDD-vN` format + 25 allowed prefixes
-- **Social tasks** — one-time YouTube subscribe & TikTok follow bonuses (10,000 coins each)
-- **Referral system** — 6,000 coins per referred user, tracked via Cloudflare Worker
-- **TON wallet management** — save / update wallet address with a 14-day cooldown
-- **i18n** — 6 languages: English, বাংলা, हिंदी, Español, العربية, Deutsch
-- **Cloud storage** — state persisted in `Telegram.WebApp.CloudStorage` (≤ 4 096 bytes), falls back to localStorage in browser dev mode
-- **Ad integrations** — Monetag Zone 10883491 (`show_10883491`) + OnClickA Spot 6116695 / Ad 436671
-- **Sound effects** — sci-fi click via `use-sound`
-- **Dark theme** — amber-400 (#FBBF24) primary on #0D0D0D background
+## CloudStorage Schema
 
----
+User state is persisted under the Telegram CloudStorage key:
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | React 19 + Vite 6 |
-| Routing | react-router-dom v7 |
-| State | React Context + Telegram CloudStorage |
-| Styling | Tailwind CSS v4 + shadcn/ui |
-| Animation | framer-motion |
-| Icons | @phosphor-icons/react |
-| i18n | i18next + react-i18next |
-| Telegram API | `window.Telegram.WebApp` (native) |
-| Build | pnpm monorepo workspace |
-
----
-
-## Project Structure
-
-```
-src/
-├── App.tsx                  # Router + providers
-├── main.tsx                 # Entry — calls WebApp.ready() / .expand()
-├── index.css                # Dark theme tokens (HSL + hex)
-├── components/
-│   ├── BottomNav.tsx        # Home / Earn / Profile tab bar
-│   ├── ButtonTap.tsx        # Touch-feedback wrapper
-│   └── ProtectedRoute.tsx   # Redirects unverified users to /verify
-├── context/
-│   └── UserContext.tsx      # Global state, CloudStorage writes, daily reset
-├── hooks/
-│   ├── useTelegramWebApp.ts # WebApp + CloudStorage hooks (native API)
-│   ├── useSoundEffects.ts   # use-sound wrapper
-│   └── useDisableContextMenu.ts
-├── i18n/
-│   ├── i18n.ts              # i18next init — en, bn, hi, es, ar, de
-│   └── locales/             # en.json  bn.json  hi.json  es.json  ar.json  de.json
-├── pages/
-│   ├── SplashScreen.tsx     # Animated logo → auto-navigate
-│   ├── VerifyPage.tsx       # Channel join + membership verification
-│   ├── HomePage.tsx         # Stats dashboard
-│   ├── EarnPage.tsx         # Tasks / claim codes / social missions
-│   └── ProfilePage.tsx      # Language, wallet, referral, legal
-└── types/
-    └── index.ts             # CensorCoinUserState, constants, ALLOWED_CLAIM_PREFIXES
+```ts
+censorCoinUser_v1
 ```
 
----
+Stored JSON shape:
 
-## Environment / External Services
-
-| Service | Purpose |
-|---|---|
-| `telegram-membership-bot-kwq6.onrender.com` | Verify channel membership |
-| `tma-referral-worker.shahadathakhand7.workers.dev` | Register user + count daily referrals |
-| `t.me/censorcoin` | Official Telegram channel (ID `-1003925758863`) |
-| `t.me/Censorcoin_bot` | Bot for referral deep-links |
-| Monetag Zone `10883491` | Rewarded interstitial ads |
-| OnClickA Spot `6116695` / Ad `436671` | In-stream TMA rewarded ads |
-
----
-
-## Coin Economy
-
-| Action | Reward | Limit |
+| Field | Type | Purpose |
 |---|---|---|
-| Daily moderation task | 5,000 coins | 6 / day |
-| Claim code | 3,000 coins | 7 / day |
-| YouTube subscribe | 10,000 coins | once |
-| TikTok follow | 10,000 coins | once |
-| Referral | 6,000 coins | unlimited |
+| `schema_version` | `1` | Storage schema version |
+| `membership_verified` | `boolean` | Whether channel membership was verified |
+| `reg_status` | `"unregistered" \| "registered"` | Referral worker registration status |
+| `referral_code` | `string` | User referral code for bot deep-links |
+| `username` | `string` | Telegram username |
+| `first_name` | `string` | Telegram first name |
+| `profile_photo_url` | `string \| null` | Telegram profile image URL |
+| `total_points` | `number` | Coin balance |
+| `total_refers` | `number` | Referral count |
+| `today_tasks_completed` | `number` | Daily Monetag task count, max 6 |
+| `claim_codes_used` | `string[]` | Daily claim slots used, e.g. `v1` |
+| `youtube_task_completed` | `boolean` | One-time YouTube task completion |
+| `tiktok_task_completed` | `boolean` | One-time TikTok task completion |
+| `last_daily_reset` | `string` | Asia/Dhaka date for daily reset |
+| `last_referral_check_date` | `string` | Asia/Dhaka date for referral sync |
+| `ton_address` | `string` | Saved TON wallet address |
+| `last_ton_address_change` | `string` | ISO timestamp for 14-day cooldown |
+| `language` | `en \| bn \| hi \| es \| ar \| de` | Saved UI language |
 
-Daily counters reset at midnight **Asia/Dhaka** (UTC+6).
+The serialized state is capped at 4,096 bytes. In browser development mode, storage falls back to `localStorage`.
 
----
+## API Endpoints
 
-## Claim Code Format
+External APIs used by the app:
 
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `https://telegram-membership-bot-kwq6.onrender.com/verify` | `POST` | Verifies Telegram channel membership for channel `-1003925758863` |
+| `https://tma-referral-worker.shahadathakhand7.workers.dev/api/register` | `POST` | Registers the Telegram user and returns a referral code |
+| `https://tma-referral-worker.shahadathakhand7.workers.dev/api/daily-referral-count?telegram_id=...` | `GET` | Returns daily referral count used to award referral coins |
+
+Verification request body:
+
+```json
+{
+  "user_id": 123456789,
+  "channel_username": "-1003925758863"
+}
 ```
+
+Registration request body:
+
+```json
+{
+  "telegram_id": 123456789,
+  "username": "telegram_username",
+  "first_name": "First",
+  "referral_code_used": "OPTIONAL_START_PARAM"
+}
+```
+
+## Ad Integration Details
+
+### Monetag
+
+- Package: `monetag-tg-sdk`
+- Zone ID: `10883491`
+- Daily moderation task rewards: `5,000` coins
+- First 3 daily tasks use Rewarded Pop: `adHandler('pop')`
+- Next 3 daily tasks use Rewarded Interstitial: `adHandler()`
+
+Implementation location: `src/pages/EarnPage.tsx`
+
+```ts
+import createAdHandler from 'monetag-tg-sdk'
+const adHandler = createAdHandler(10883491)
+```
+
+### OnClickA
+
+- Spot ID: `6116695`
+- Ad Code ID: `436671`
+- Script loaded in `index.html`:
+
+```html
+<script src="https://js.onclckvd.com/in-stream-ad-admanager/tma.js"></script>
+```
+
+Claim-code rewards use the OnClickA TMA `window.initCdTma({ id })` flow in `src/components/AdComponent.tsx`. Successful rewarded ads call the claim reward handler and award `3,000` coins.
+
+## UI and Sound
+
+- shadcn/ui components are used for buttons, cards, dialogs, inputs, avatar, separator, tabs, and toast support.
+- `src/components/ButtonTap.tsx` wraps the shadcn button variant styling with existing tap feedback.
+- `public/scifi-click.mp3` is the only click sound used.
+- `src/hooks/useGlobalClickSound.ts` plays the existing sci-fi sound on interactive taps not already handled by `ButtonTap`.
+
+## Claim Codes
+
+Format:
+
+```txt
 PREFIX-YYYYMMDD-vN
 ```
 
-- `PREFIX` must be one of 25 approved prefixes (`S9t`, `RSt`, `J9r`, `X4k`, `P7m`, …)
-- `YYYYMMDD` must match the current date in Asia/Dhaka timezone
-- `N` is the version slot 1–7 (one per day per slot)
+Rules:
 
----
+- `PREFIX` must be one of the approved prefixes in `src/types/index.ts`.
+- `YYYYMMDD` must match the current Asia/Dhaka date.
+- `vN` must match the current claim slot from `v1` through `v7`.
+- Each slot can be claimed once per day.
 
 ## Development
 
 ```bash
 pnpm install
-pnpm --filter censor-coin-tma dev
+pnpm dev
 ```
 
-The app runs in **browser dev mode** when `window.Telegram` is absent — the Verify page shows a "Continue in Browser (Dev Preview)" bypass button and falls back to `localStorage` for persistence.
-
----
+Browser development mode appears when Telegram APIs are unavailable. The Verify screen provides a dev bypass and storage falls back to `localStorage`.
 
 ## Build
 
 ```bash
-pnpm --filter censor-coin-tma build
+npm run build
 ```
 
-Output is written to `dist/`. The Vite config sets `base: '/'`.
+or
 
----
+```bash
+pnpm build
+```
+
+The output is written to `dist/`.
+
+## GitHub Pages Deployment
+
+The repository includes `.github/workflows/deploy.yml`.
+
+On every push to `main`, GitHub Actions:
+
+1. Installs pnpm and Node.js.
+2. Runs `pnpm install --frozen-lockfile`.
+3. Builds with `BASE_PATH=/censor-coin-tma-final/`.
+4. Uploads `dist/` as a Pages artifact.
+5. Deploys to GitHub Pages.
+
+Expected Pages URL:
+
+```txt
+https://shahadathakhand747.github.io/censor-coin-tma-final/
+```
 
 ## License
 

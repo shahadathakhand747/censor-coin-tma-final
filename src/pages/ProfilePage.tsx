@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import i18n from '../i18n/i18n';
 import {
   Globe, VideoCamera, Wallet, Copy, Check,
@@ -11,10 +11,13 @@ import { useUser } from '../context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import ButtonTap from '../components/ButtonTap';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 
-// Icons8 Fluency — free CDN, transparent background
 const REFERRAL_IMG = 'https://img.icons8.com/fluency/256/coin-in-hand.png';
-
 const DAILY_REFERRAL_URL = 'https://tma-referral-worker.shahadathakhand7.workers.dev/api/daily-referral-count';
 const REFERRAL_BOT = 'https://t.me/Censorcoin_bot?start=';
 
@@ -23,9 +26,9 @@ const LANGUAGES = [
   { code: 'bn', label: 'বাংলা', flag: '🇧🇩' },
   { code: 'hi', label: 'हिंदी', flag: '🇮🇳' },
   { code: 'es', label: 'Español', flag: '🇪🇸' },
-  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
 ] as const;
+
+type ProfileLanguage = (typeof LANGUAGES)[number]['code'];
 
 function getBangladeshDate(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
@@ -44,42 +47,6 @@ function maskAddress(addr: string): string {
   return addr.slice(0, 6) + '...' + addr.slice(-6);
 }
 
-// Reusable bottom-sheet modal wrapper
-function BottomSheet({
-  open,
-  onClose,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="w-full bg-[#1C1C1E] rounded-t-3xl border-t border-white/10 p-6 max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {children}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
 export default function ProfilePage() {
   const { t } = useTranslation();
   const { user, updateUser } = useUser();
@@ -92,6 +59,9 @@ export default function ProfilePage() {
   const [copied, setCopied] = useState(false);
 
   const referralLink = `${REFERRAL_BOT}${user.referral_code}`;
+  const currentLanguage = LANGUAGES.find((l) => l.code === user.language) || LANGUAGES[0];
+  const walletCooldownDays = user.ton_address ? daysSince(user.last_ton_address_change) : Infinity;
+  const walletLocked = user.ton_address && walletCooldownDays < 14;
 
   const openModal = (fn: () => void) => {
     playSound('modal');
@@ -119,7 +89,7 @@ export default function ProfilePage() {
     checkReferrals();
   }, []);
 
-  const handleLangChange = async (lang: 'en' | 'bn' | 'hi' | 'es' | 'ar' | 'de') => {
+  const handleLangChange = async (lang: ProfileLanguage) => {
     await i18n.changeLanguage(lang);
     await updateUser({ language: lang });
     setLangModal(false);
@@ -163,7 +133,7 @@ export default function ProfilePage() {
     {
       icon: Globe,
       label: t('profile.language'),
-      value: LANGUAGES.find((l) => l.code === user.language)?.label || 'English',
+      value: currentLanguage.label,
       onClick: () => openModal(() => setLangModal(true)),
       color: 'text-blue-400',
       bg: 'bg-blue-400/10',
@@ -193,233 +163,201 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] pb-8">
-
-      {/* ── Language Modal ── */}
-      <BottomSheet open={langModal} onClose={() => setLangModal(false)}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-white font-bold text-lg">{t('profile.selectLanguage')}</h3>
-          <ButtonTap
-            onClick={() => setLangModal(false)}
-            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
-          >
-            <X size={18} className="text-white/70" />
-          </ButtonTap>
-        </div>
-        <div className="flex flex-col gap-2.5">
-          {LANGUAGES.map(({ code, label, flag }) => (
-            <ButtonTap
-              key={code}
-              onClick={() => handleLangChange(code)}
-              className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
-                user.language === code
-                  ? 'border-amber-400/50 bg-amber-400/10'
-                  : 'border-white/8 bg-white/5'
-              }`}
-            >
-              <span className="text-2xl">{flag}</span>
-              <span
-                className={`font-semibold text-sm flex-1 text-left ${
-                  user.language === code ? 'text-amber-400' : 'text-white'
+    <div className="min-h-screen bg-[#0D0D0D] px-5 pb-8 pt-8">
+      <Dialog open={langModal} onOpenChange={setLangModal}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-[430px] rounded-3xl border-white/10 bg-[#1C1C1E] p-0 text-white shadow-2xl">
+          <DialogHeader className="flex-row items-center justify-between space-y-0 border-b border-white/10 px-5 py-4 text-left">
+            <DialogTitle className="text-base font-bold text-white">{t('profile.selectLanguage')}</DialogTitle>
+            <ButtonTap onClick={() => setLangModal(false)} className="h-9 w-9 rounded-full bg-white/10 text-white/70">
+              <X size={18} />
+            </ButtonTap>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 p-4">
+            {LANGUAGES.map(({ code, label, flag }) => (
+              <ButtonTap
+                key={code}
+                onClick={() => handleLangChange(code)}
+                className={`flex w-full items-center gap-4 rounded-2xl border p-4 transition-all ${
+                  user.language === code
+                    ? 'border-amber-400/50 bg-amber-400/10'
+                    : 'border-white/10 bg-white/5'
                 }`}
               >
-                {label}
-              </span>
-              {user.language === code && (
-                <Check size={16} weight="bold" className="text-amber-400" />
-              )}
+                <span className="text-2xl">{flag}</span>
+                <span className={`flex-1 text-left text-sm font-semibold ${user.language === code ? 'text-amber-400' : 'text-white'}`}>
+                  {label}
+                </span>
+                {user.language === code && <Check size={16} weight="bold" className="text-amber-400" />}
+              </ButtonTap>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={walletModal} onOpenChange={setWalletModal}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-[430px] rounded-3xl border-white/10 bg-[#1C1C1E] p-0 text-white shadow-2xl">
+          <DialogHeader className="flex-row items-center justify-between space-y-0 border-b border-white/10 px-5 py-4 text-left">
+            <DialogTitle className="text-base font-bold text-white">{t('profile.editWallet')}</DialogTitle>
+            <ButtonTap onClick={() => setWalletModal(false)} className="h-9 w-9 rounded-full bg-white/10 text-white/70">
+              <X size={18} />
             </ButtonTap>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 p-5">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium uppercase tracking-wider text-white/50">
+                {t('profile.walletAddress')}
+              </label>
+              <Input
+                type="text"
+                value={walletInput}
+                onChange={(e) => setWalletInput(e.target.value)}
+                placeholder={t('profile.walletPlaceholder')}
+                className="h-12 rounded-xl border-white/10 bg-[#0D0D0D] px-4 font-mono text-sm text-white placeholder:text-white/20 focus-visible:ring-amber-400/40"
+              />
+            </div>
+            {walletLocked && (
+              <Card className="border-yellow-500/20 bg-yellow-500/10 shadow-none">
+                <CardContent className="p-4">
+                  <p className="text-xs leading-relaxed text-yellow-400">
+                    {t('profile.walletCooldown', { days: 14 - walletCooldownDays })}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            <ButtonTap onClick={handleSaveWallet} className="w-full rounded-xl bg-amber-400 py-4 text-sm font-bold text-black">
+              {t('profile.save')}
+            </ButtonTap>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex flex-col gap-5">
+        <Card className="overflow-hidden rounded-3xl border-amber-400/20 bg-gradient-to-br from-[#1A1A1A] to-[#111111] shadow-2xl shadow-amber-400/5">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20 rounded-3xl border-2 border-amber-400/40 shadow-lg">
+                {user.profile_photo_url && <AvatarImage src={user.profile_photo_url} alt="Profile" className="object-cover" />}
+                <AvatarFallback className="rounded-3xl bg-gradient-to-br from-amber-400/25 to-amber-600/10 text-2xl font-black text-amber-400">
+                  {(user.first_name || 'U').charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium uppercase tracking-[0.22em] text-amber-400/70">Censor Coin Profile</p>
+                <h2 className="mt-1 truncate text-2xl font-black text-white">{user.first_name || 'Censor User'}</h2>
+                {user.username && <p className="text-sm text-white/45">@{user.username}</p>}
+                <p className="mt-2 text-xs font-semibold text-white/40">TON: {user.ton_address ? maskAddress(user.ton_address) : t('profile.notConnected')}</p>
+              </div>
+            </div>
+            <Separator className="my-5 bg-white/10" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">Balance</p>
+                <p className="mt-1 text-xl font-black text-white">{user.total_points.toLocaleString()}</p>
+              </div>
+              <div className="rounded-2xl border border-blue-400/15 bg-blue-400/10 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-400/70">Referrals</p>
+                <p className="mt-1 text-xl font-black text-white">{user.total_refers}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-3">
+          {settingsCards.map(({ icon: Icon, label, value, onClick, color, bg, border }) => (
+            <Card key={label} className={`rounded-3xl bg-[#1A1A1A] shadow-none ${border}`}>
+              <CardContent className="p-0">
+                <ButtonTap onClick={onClick} className="flex w-full items-center gap-4 p-4">
+                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${bg}`}>
+                    <Icon size={21} weight="thin" className={color} />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="text-xs text-white/45">{label}</p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-white">{value}</p>
+                  </div>
+                  <CaretRight size={16} className="shrink-0 text-white/20" />
+                </ButtonTap>
+              </CardContent>
+            </Card>
           ))}
         </div>
-      </BottomSheet>
 
-      {/* ── Wallet Modal ── */}
-      <BottomSheet open={walletModal} onClose={() => setWalletModal(false)}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-white font-bold text-lg">{t('profile.editWallet')}</h3>
-          <ButtonTap
-            onClick={() => setWalletModal(false)}
-            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
-          >
-            <X size={18} className="text-white/70" />
-          </ButtonTap>
-        </div>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label className="text-white/50 text-xs uppercase tracking-wider font-medium">
-              {t('profile.walletAddress')}
-            </label>
-            <input
-              type="text"
-              value={walletInput}
-              onChange={(e) => setWalletInput(e.target.value)}
-              placeholder={t('profile.walletPlaceholder')}
-              className="w-full bg-[#0D0D0D] border border-white/10 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-amber-400/50 placeholder:text-white/20 transition-colors"
-            />
-          </div>
-          {user.ton_address && daysSince(user.last_ton_address_change) < 14 && (
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 flex items-start gap-2">
-              <span className="text-yellow-400 text-base">⚠️</span>
-              <p className="text-yellow-400 text-xs leading-relaxed">
-                {t('profile.walletCooldown', {
-                  days: 14 - daysSince(user.last_ton_address_change),
-                })}
+        <Card className="rounded-3xl border-white/10 bg-[#1A1A1A] shadow-none">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-white">{t('profile.referralSection')}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-white/40">Invite friends and earn 6,000 coins per referral</p>
+              </div>
+              <motion.img
+                src={REFERRAL_IMG}
+                alt="Referral"
+                className="h-16 w-16 object-contain drop-shadow-xl select-none"
+                animate={{ y: [0, -5, 0] }}
+                transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
+                draggable={false}
+              />
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-blue-400/15 bg-blue-400/10 p-4">
+                <Users size={18} weight="thin" className="text-blue-400" />
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-white/40">{t('profile.totalRefers')}</p>
+                <p className="mt-1 text-xl font-black text-white">{user.total_refers}</p>
+              </div>
+              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4">
+                <CurrencyCircleDollar size={18} weight="thin" className="text-amber-400" />
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-white/40">{t('profile.referralEarnings')}</p>
+                <p className="mt-1 text-xl font-black text-white">{(user.total_refers * 6000).toLocaleString()}</p>
+              </div>
+            </div>
+            <Separator className="my-5 bg-white/10" />
+            <div className="rounded-2xl border border-white/10 bg-[#0D0D0D] p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-white/40">{t('profile.referralLink')}</p>
+              <p className="mt-3 break-all font-mono text-xs leading-relaxed text-amber-400/85">
+                {user.referral_code ? referralLink : 'Complete registration to get your link'}
               </p>
-            </div>
-          )}
-          <ButtonTap
-            onClick={handleSaveWallet}
-            className="w-full py-4 rounded-xl bg-amber-400 text-black font-bold text-sm"
-          >
-            {t('profile.save')}
-          </ButtonTap>
-        </div>
-      </BottomSheet>
-
-      {/* ── Profile Header ── */}
-      <div className="px-5 pt-10 pb-6">
-        <div className="flex items-center gap-4">
-          {user.profile_photo_url ? (
-            <img
-              src={user.profile_photo_url}
-              alt="Profile"
-              className="w-16 h-16 rounded-2xl border-2 border-amber-400/40 object-cover shadow-lg"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400/20 to-amber-600/10 flex items-center justify-center text-amber-400 font-black text-2xl border-2 border-amber-400/30 shadow-lg">
-              {(user.first_name || 'U').charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h2 className="text-white font-bold text-xl truncate">
-              {user.first_name || 'Censor User'}
-            </h2>
-            {user.username && (
-              <p className="text-white/40 text-sm">@{user.username}</p>
-            )}
-            <p className="text-amber-400 font-bold text-base mt-0.5">
-              {user.total_points.toLocaleString()} coins
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Settings Cards ── */}
-      <div className="px-5 flex flex-col gap-2.5">
-        {settingsCards.map(({ icon: Icon, label, value, onClick, color, bg, border }) => (
-          <ButtonTap
-            key={label}
-            onClick={onClick}
-            className={`w-full bg-[#1A1A1A] rounded-2xl border ${border} p-4 flex items-center gap-4`}
-          >
-            <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-              <Icon size={20} weight="thin" className={color} />
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-white/50 text-xs">{label}</p>
-              <p className="text-white font-semibold text-sm mt-0.5 truncate">
-                {value}
-              </p>
-            </div>
-            <CaretRight size={16} className="text-white/20 shrink-0" />
-          </ButtonTap>
-        ))}
-      </div>
-
-      {/* ── Referral Section ── */}
-      <div className="px-5 pt-8">
-        <h3 className="text-white font-black text-xl mb-1">{t('profile.referralSection')}</h3>
-        <p className="text-white/40 text-xs mb-4">Invite friends and earn 6,000 coins per referral</p>
-
-        <div className="flex justify-center py-3">
-          <motion.img
-            src={REFERRAL_IMG}
-            alt="Referral"
-            className="w-20 h-20 object-contain drop-shadow-xl select-none"
-            animate={{ y: [0, -5, 0] }}
-            transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
-            draggable={false}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-[#1A1A1A] rounded-2xl border border-blue-400/15 p-4 flex flex-col gap-2">
-            <div className="w-9 h-9 rounded-xl bg-blue-400/10 flex items-center justify-center">
-              <Users size={18} weight="thin" className="text-blue-400" />
-            </div>
-            <div>
-              <p className="text-white/40 text-[10px] uppercase tracking-wider">{t('profile.totalRefers')}</p>
-              <p className="text-white font-bold text-xl mt-0.5">{user.total_refers}</p>
-            </div>
-          </div>
-          <div className="bg-[#1A1A1A] rounded-2xl border border-amber-400/15 p-4 flex flex-col gap-2">
-            <div className="w-9 h-9 rounded-xl bg-amber-400/10 flex items-center justify-center">
-              <CurrencyCircleDollar size={18} weight="thin" className="text-amber-400" />
-            </div>
-            <div>
-              <p className="text-white/40 text-[10px] uppercase tracking-wider">{t('profile.referralEarnings')}</p>
-              <p className="text-white font-bold text-xl mt-0.5">
-                {(user.total_refers * 6000).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[#1A1A1A] rounded-2xl border border-white/8 p-4 flex flex-col gap-3">
-          <p className="text-white/40 text-xs uppercase tracking-wider font-medium">
-            {t('profile.referralLink')}
-          </p>
-          <p className="text-amber-400/80 text-xs font-mono break-all leading-relaxed">
-            {user.referral_code ? referralLink : 'Complete registration to get your link'}
-          </p>
-          {user.referral_code && (
-            <ButtonTap
-              onClick={handleCopy}
-              className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-amber-400/10 border border-amber-400/30 transition-all active:bg-amber-400/20"
-            >
-              {copied ? (
-                <>
-                  <Check size={16} weight="bold" className="text-green-400" />
-                  <span className="text-green-400 text-sm font-semibold">{t('profile.copied')}</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={16} weight="thin" className="text-amber-400" />
-                  <span className="text-amber-400 text-sm font-semibold">{t('profile.copyLink')}</span>
-                </>
+              {user.referral_code && (
+                <ButtonTap onClick={handleCopy} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 py-3.5">
+                  {copied ? (
+                    <>
+                      <Check size={16} weight="bold" className="text-green-400" />
+                      <span className="text-sm font-semibold text-green-400">{t('profile.copied')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={16} weight="thin" className="text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-400">{t('profile.copyLink')}</span>
+                    </>
+                  )}
+                </ButtonTap>
               )}
-            </ButtonTap>
-          )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-3">
+          <Card className="rounded-3xl border-green-400/15 bg-[#1A1A1A] shadow-none">
+            <CardContent className="p-0">
+              <ButtonTap onClick={() => window.open('https://censorcoin.io/privacy', '_blank')} className="flex w-full items-center gap-4 p-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-400/10">
+                  <ShieldCheck size={21} weight="thin" className="text-green-400" />
+                </div>
+                <p className="flex-1 text-left text-sm font-bold text-white">{t('profile.privacy')}</p>
+                <CaretRight size={16} className="text-white/20" />
+              </ButtonTap>
+            </CardContent>
+          </Card>
+          <Card className="rounded-3xl border-blue-400/15 bg-[#1A1A1A] shadow-none">
+            <CardContent className="p-0">
+              <ButtonTap onClick={() => window.open('https://censorcoin.io/terms', '_blank')} className="flex w-full items-center gap-4 p-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-400/10">
+                  <FileText size={21} weight="thin" className="text-blue-400" />
+                </div>
+                <p className="flex-1 text-left text-sm font-bold text-white">{t('profile.terms')}</p>
+                <CaretRight size={16} className="text-white/20" />
+              </ButtonTap>
+            </CardContent>
+          </Card>
         </div>
-      </div>
-
-      {/* ── Legal Links ── */}
-      <div className="px-5 pt-6 flex flex-col gap-2.5">
-        <ButtonTap
-          onClick={() => window.open('https://censorcoin.io/privacy', '_blank')}
-          className="w-full bg-[#1A1A1A] rounded-2xl border border-white/8 p-4 flex items-center gap-4"
-        >
-          <div className="w-10 h-10 rounded-xl bg-green-400/10 flex items-center justify-center shrink-0">
-            <ShieldCheck size={20} weight="thin" className="text-green-400" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-white font-semibold text-sm">{t('profile.privacy')}</p>
-          </div>
-          <CaretRight size={16} className="text-white/20 shrink-0" />
-        </ButtonTap>
-
-        <ButtonTap
-          onClick={() => window.open('https://censorcoin.io/terms', '_blank')}
-          className="w-full bg-[#1A1A1A] rounded-2xl border border-white/8 p-4 flex items-center gap-4"
-        >
-          <div className="w-10 h-10 rounded-xl bg-blue-400/10 flex items-center justify-center shrink-0">
-            <FileText size={20} weight="thin" className="text-blue-400" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-white font-semibold text-sm">{t('profile.terms')}</p>
-          </div>
-          <CaretRight size={16} className="text-white/20 shrink-0" />
-        </ButtonTap>
       </div>
     </div>
   );

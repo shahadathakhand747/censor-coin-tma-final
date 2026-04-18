@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
+import createAdHandler from 'monetag-tg-sdk';
 import {
   Eye, CheckCircle, Lock, YoutubeLogo, TiktokLogo,
   X, ArrowRight, Lightning, Medal, Star, Ticket,
@@ -9,8 +10,10 @@ import {
 import { useUser } from '../context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import ButtonTap from '../components/ButtonTap';
+import AdComponent from '../components/AdComponent';
 import { ALLOWED_CLAIM_PREFIXES } from '../types';
 import { useSoundEffects } from '../hooks/useSoundEffects';
+import { Input } from '@/components/ui/input';
 
 // Icons8 3D Fluency — free CDN, transparent background
 const TASK_IMG     = 'https://img.icons8.com/3d-fluency/128/binoculars.png';
@@ -21,6 +24,7 @@ const TIKTOK_IMG   = 'https://img.icons8.com/3d-fluency/128/tiktok.png';
 
 // Lottie CDN URL for reward celebration animation (LottieFiles — Lottie Simple License)
 const REWARD_LOTTIE_URL = 'https://assets3.lottiefiles.com/packages/lf20_xTyGda.json';
+const adHandler = createAdHandler(10883491);
 
 function getBangladeshDate(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
@@ -133,6 +137,7 @@ function ModerationModal({
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [adError, setAdError] = useState('');
   const { playSound } = useSoundEffects();
   const imageSeeds = useRef([
     Math.floor(Math.random() * 900) + 100,
@@ -151,23 +156,18 @@ function ModerationModal({
 
   const handleSubmit = async () => {
     setIsProcessing(true);
+    setAdError('');
     try {
-      const adFn = (window as unknown as Record<string, unknown>)[
-        'show_10883491'
-      ] as ((format?: string) => Promise<void>) | undefined;
-
-      if (adFn) {
-        if (taskIndex < 3) {
-          await adFn('pop');
-        } else {
-          await adFn();
-        }
+      if (taskIndex < 3) {
+        await adHandler('pop');
       } else {
-        await new Promise<void>((res) => setTimeout(res, 600));
+        await adHandler();
       }
       onComplete();
-    } catch {
-      onComplete();
+    } catch (error) {
+      playSound('error');
+      setAdError(error instanceof Error ? error.message : 'Ad is not available. Please try again.');
+      setIsProcessing(false);
     }
   };
 
@@ -262,6 +262,11 @@ function ModerationModal({
                 </>
               )}
             </ButtonTap>
+            {adError && (
+              <p className="mt-2 text-center text-xs font-medium text-red-400">
+                {adError}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -321,58 +326,39 @@ function UnifiedClaimModal({
     return null;
   };
 
-  const handleSubmit = async () => {
+  const completeClaim = async () => {
+    await onComplete(currentSlot);
+    setJustClaimed(true);
+    playSound('success');
+    setCode('');
+    setIsProcessing(false);
+    setTimeout(() => {
+      const next = findNextSlot(currentSlot);
+      if (next) {
+        setCurrentSlot(next);
+        setJustClaimed(false);
+      } else {
+        onClose();
+      }
+    }, 1400);
+  };
+
+  const handleBeforeAd = () => {
     const err = validateCode(code);
     if (err) {
       playSound('error');
       setError(err);
-      return;
+      return false;
     }
     setError('');
     setIsProcessing(true);
-    try {
-      await new Promise<void>((resolve, reject) => {
-        if (window.OnClickA) {
-          window.OnClickA.showRewardedAd({
-            adCode: 436671,
-            onComplete: resolve,
-            onError: reject,
-          });
-        } else {
-          setTimeout(resolve, 500);
-        }
-      });
-      await onComplete(currentSlot);
-      setJustClaimed(true);
-      playSound('success');
-      setCode('');
-      // After a brief moment, show next slot or close
-      setTimeout(() => {
-        const next = findNextSlot(currentSlot);
-        if (next) {
-          setCurrentSlot(next);
-          setJustClaimed(false);
-        } else {
-          onClose();
-        }
-      }, 1400);
-    } catch {
-      await onComplete(currentSlot);
-      setJustClaimed(true);
-      playSound('success');
-      setCode('');
-      setTimeout(() => {
-        const next = findNextSlot(currentSlot);
-        if (next) {
-          setCurrentSlot(next);
-          setJustClaimed(false);
-        } else {
-          onClose();
-        }
-      }, 1400);
-    } finally {
-      setIsProcessing(false);
-    }
+    return true;
+  };
+
+  const handleAdError = (err: unknown) => {
+    playSound('error');
+    setIsProcessing(false);
+    setError(err instanceof Error ? err.message : 'Ad is not available. Please try again.');
   };
 
   const nextSlot = findNextSlot(currentSlot);
@@ -509,7 +495,7 @@ function UnifiedClaimModal({
                   <label className="text-white/60 text-xs font-medium uppercase tracking-wider">
                     {t('earn.enterCode')}
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={code}
                     onChange={(e) => {
@@ -517,7 +503,7 @@ function UnifiedClaimModal({
                       setError('');
                     }}
                     placeholder={`S9t-${formatDateForCode()}-v${currentSlot}`}
-                    className="w-full bg-[#0D0D0D] border border-white/10 rounded-xl px-4 py-3.5 text-white text-sm font-mono focus:outline-none focus:border-amber-400/50 placeholder:text-white/20 transition-colors"
+                    className="h-12 w-full bg-[#0D0D0D] border-white/10 rounded-xl px-4 py-3.5 text-white text-sm font-mono focus-visible:ring-amber-400/40 placeholder:text-white/20 transition-colors"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -537,8 +523,10 @@ function UnifiedClaimModal({
                 </div>
 
                 {/* Submit button */}
-                <ButtonTap
-                  onClick={handleSubmit}
+                <AdComponent
+                  onBeforeShow={handleBeforeAd}
+                  onReward={completeClaim}
+                  onError={handleAdError}
                   disabled={isProcessing || !code.trim() || isSlotDone}
                   className="w-full py-4 rounded-xl bg-amber-400 text-black font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
                 >
@@ -555,7 +543,7 @@ function UnifiedClaimModal({
                       <Lightning size={18} weight="fill" />
                     </>
                   )}
-                </ButtonTap>
+                </AdComponent>
               </motion.div>
             )}
           </AnimatePresence>

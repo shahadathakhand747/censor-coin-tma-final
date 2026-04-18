@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 
 interface ButtonTapProps {
@@ -32,7 +34,8 @@ export default function ButtonTap({
       transition={{ type: 'spring', stiffness: 400 }}
       onClick={handleClick}
       disabled={disabled}
-      className={className}
+      data-sound-handled="true"
+      className={cn(buttonVariants({ variant: 'ghost' }), 'h-auto min-h-0 rounded-xl p-0 hover:bg-transparent active:bg-transparent', className)}
     >
       {children}
     </motion.button>
