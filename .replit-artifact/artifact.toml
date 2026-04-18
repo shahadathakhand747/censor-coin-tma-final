@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Censor Coin TMA"
+version = "1.0.0"
+id = "artifacts/censor-coin-tma"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18360
+
+[services.development]
+run = "pnpm --filter @workspace/censor-coin-tma run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/censor-coin-tma", "run", "build" ]
+publicDir = "artifacts/censor-coin-tma/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18360"
+BASE_PATH = "/"
